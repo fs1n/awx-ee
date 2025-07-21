@@ -23,6 +23,7 @@ dependencies:
       - name: google.cloud
       - name: openstack.cloud
       - name: community.vmware
+      - name: vmware.vmware
       - name: ovirt.ovirt
       - name: kubernetes.core
       - name: ansible.posix
