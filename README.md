@@ -1,6 +1,6 @@
 # AWX EE
 
-The default Execution Environment for AWX.
+This is a Fork of the Default (AWX execution environment)[https://github.com/ansible/awx-ee] updated with some stuff for VMWare automation due to the deprecation of community.vmware
 
 ## Build the image locally
 
