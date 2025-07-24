@@ -74,15 +74,22 @@ run_tests() {
     print_status "Test 5: Verifying Python packages"
     $CONTAINER_RUNTIME run --rm "$image_name" python -c "
 import sys
-packages = ['pyvmomi', 'paramiko', 'requests', 'pyyaml', 'ansible']
+# Test packages with their correct import names
+package_tests = [
+    ('pyvmomi', 'pyVim'),
+    ('paramiko', 'paramiko'),
+    ('requests', 'requests'),
+    ('pyyaml', 'yaml'),
+    ('ansible', 'ansible')
+]
 failed = []
-for pkg in packages:
+for pkg_name, import_name in package_tests:
     try:
-        __import__(pkg)
-        print(f'✓ {pkg} - OK')
+        __import__(import_name)
+        print(f'✓ {pkg_name} (import {import_name}) - OK')
     except ImportError as e:
-        print(f'✗ {pkg} - FAILED: {e}')
-        failed.append(pkg)
+        print(f'✗ {pkg_name} (import {import_name}) - FAILED: {e}')
+        failed.append(pkg_name)
 
 if failed:
     print(f'Failed packages: {failed}')
