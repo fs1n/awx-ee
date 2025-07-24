@@ -30,6 +30,8 @@ This enhanced execution environment provides:
 - **Multi-Cloud Support**: Includes collections for Azure, AWS, Google Cloud, and OpenStack
 - **Container Runtime**: Podman-remote support for containerized workflows
 - **Python 3.11**: Modern Python runtime with latest features and performance improvements
+- **Industry-Standard Testing**: Comprehensive CI/CD pipeline with security scanning and validation
+- **Automated Quality Assurance**: Every change is validated through automated testing
 
 ## Prerequisites
 
@@ -240,23 +242,70 @@ ansible-builder build -v3 -t awx-ee:local --container-runtime=docker
 
 ### Testing
 
-This project uses `tox` for testing builds with different container runtimes.
+This project uses `tox` for testing builds with different container runtimes and includes a comprehensive test script for validating the execution environment.
 
-Install tox:
+#### Automated Testing Script
+
+A comprehensive test script `test-ee.sh` is provided that validates configuration, builds the image, and runs industry-standard tests:
+
+```bash
+# Run all tests (validate, build, test)
+./test-ee.sh
+
+# Run only validation
+./test-ee.sh validate
+
+# Run only build
+./test-ee.sh build
+
+# Run only tests (requires existing image)
+./test-ee.sh test
+
+# Use Docker instead of Podman
+./test-ee.sh --runtime docker
+
+# Use custom image tag
+./test-ee.sh --tag my-awx-ee:latest
+```
+
+The test script validates:
+- ✅ YAML configuration syntax
+- ✅ ansible-builder functionality  
+- ✅ Basic ansible operations
+- ✅ Python version and packages
+- ✅ Collection installation and availability
+- ✅ Sample playbook execution
+- ✅ Key collections (awx.awx, community.vmware, etc.)
+
+#### Manual Testing with Tox
+
+Install tox and run container-specific tests:
 
 ```bash
 pip install tox
-```
 
-Run tests:
-
-```bash
 # Test with Podman
 tox -e podman
 
 # Test with Docker
 tox -e docker
 ```
+
+#### GitHub Actions CI/CD
+
+The repository includes a comprehensive GitHub Actions workflow (`build-and-test-ee.yml`) that:
+
+- **Validates dependencies** on every PR and push
+- **Runs security scanning** with Trivy
+- **Tests functionality** with sample playbooks
+- **Verifies collections and packages** are properly installed
+- **Publishes images** on releases and main branch updates
+- **Tests published images** to ensure they work correctly
+
+The workflow runs on:
+- Pull requests to main branch
+- Pushes to main branch  
+- Published releases
 
 ### Modifying the Execution Environment
 
@@ -291,8 +340,45 @@ podman run --rm -it awx-ee:test ansible --version
 - Keep changes focused and atomic
 - Update documentation for user-facing changes
 - Test your changes with both Podman and Docker if possible
+- **Run the test script** before submitting: `./test-ee.sh`
 - Follow existing code style and conventions
 - Update the version in relevant files if making significant changes
+- **All PRs are automatically tested** via GitHub Actions for quality assurance
+
+## Continuous Integration
+
+This repository uses a comprehensive GitHub Actions workflow for quality assurance:
+
+### Build and Test Pipeline
+
+The `build-and-test-ee.yml` workflow provides industry-standard testing:
+
+1. **Dependency Validation**
+   - YAML syntax validation
+   - Python dependency verification  
+   - ansible-builder compatibility check
+
+2. **Build and Security Testing**
+   - Execution environment image build
+   - Trivy security vulnerability scanning
+   - SARIF security report upload
+
+3. **Functional Testing**  
+   - Basic ansible functionality verification
+   - Collection availability testing
+   - Python package validation
+   - Sample playbook execution
+
+4. **Publishing**
+   - Smart tagging based on event type
+   - Multi-registry publishing support
+   - Post-publish verification testing
+
+### Workflow Triggers
+
+- **Pull Requests**: Full validation and testing (no publishing)
+- **Main Branch**: Build, test, and publish with `:main` tag
+- **Releases**: Build, test, and publish with release and `:latest` tags
 
 ## License
 

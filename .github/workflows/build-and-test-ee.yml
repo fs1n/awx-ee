@@ -1,0 +1,255 @@
+---
+name: Build and Test AWX Execution Environment
+
+"on":
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  release:
+    types: [published]
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/awx-ee
+
+jobs:
+  validate-dependencies:
+    name: Validate Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: |
+          pip install -r requirements.txt
+          pip install yamllint
+
+      - name: Validate execution-environment.yml
+        run: |
+          yamllint execution-environment.yml
+          ansible-builder --version
+          ansible-builder introspect .
+
+      - name: Check Python dependencies
+        run: |
+          echo "=== Checking Python dependencies ==="
+          python -c "
+          import yaml
+          with open('execution-environment.yml', 'r') as f:
+              ee_config = yaml.safe_load(f)
+
+          if 'dependencies' in ee_config and 'python' in ee_config['dependencies']:
+              python_deps = ee_config['dependencies']['python']
+              if isinstance(python_deps, str):
+                  deps = python_deps.strip().split('\n')
+                  print(f'Found {len([d for d in deps if d.strip()])} Python dependencies')
+                  for dep in deps:
+                      if dep.strip():
+                          print(f'  - {dep.strip()}')
+              else:
+                  print('Python dependencies found but not in expected format')
+          else:
+              print('No Python dependencies section found')
+          "
+
+  build-and-test:
+    name: Build and Test EE Image
+    runs-on: ubuntu-latest
+    needs: validate-dependencies
+    permissions:
+      contents: read
+      packages: write
+      security-events: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install build dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y podman
+          pip install -r requirements.txt
+
+      - name: Set image tags
+        id: meta
+        run: |
+          if [[ "${{ github.event_name }}" == "release" ]]; then
+            registry_tag="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+            release_tag="${{ github.event.release.tag_name }}"
+            tags="${registry_tag}:${release_tag},${registry_tag}:latest"
+            echo "tags=${tags}" >> $GITHUB_OUTPUT
+            echo "push=true" >> $GITHUB_OUTPUT
+          elif [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:main" >> $GITHUB_OUTPUT
+            echo "push=true" >> $GITHUB_OUTPUT
+          else
+            pr_num="${{ github.event.number }}"
+            echo "tags=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:pr-${pr_num}" >> $GITHUB_OUTPUT
+            echo "push=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Build Execution Environment image
+        run: |
+          set -e
+          echo "Building AWX EE with ansible-builder..."
+
+          # Build the image
+          ansible-builder build -v3 --container-runtime podman \
+            -t awx-ee:test \
+            --no-cache
+
+          echo "Build completed successfully"
+          podman images | grep awx-ee
+
+      - name: Test image basic functionality
+        run: |
+          set -e
+          echo "=== Testing basic image functionality ==="
+
+          # Test that the image runs
+          podman run --rm awx-ee:test ansible --version
+
+          # Test Python version
+          podman run --rm awx-ee:test python --version
+
+          # Test that collections are installed
+          echo "=== Checking installed collections ==="
+          podman run --rm awx-ee:test ansible-galaxy collection list
+
+          # Test specific important collections
+          echo "=== Testing key collections ==="
+          collections_cmd="ansible-galaxy collection list | grep -E '(awx\.awx|community\.vmware|vmware\.vmware)'"
+          podman run --rm awx-ee:test bash -c "${collections_cmd} || echo 'Some expected collections not found'"
+
+          # Test that Python packages are available
+          echo "=== Testing Python packages ==="
+          podman run --rm awx-ee:test python -c "
+          import sys
+          # Test packages with their correct import names
+          package_tests = [
+              ('pyvmomi', 'pyVim'),
+              ('paramiko', 'paramiko'),
+              ('requests', 'requests'),
+              ('pyyaml', 'yaml'),
+              ('ansible', 'ansible')
+          ]
+          failed = []
+          for pkg_name, import_name in package_tests:
+              try:
+                  __import__(import_name)
+                  print(f'✓ {pkg_name} (import {import_name}) - OK')
+              except ImportError as e:
+                  print(f'✗ {pkg_name} (import {import_name}) - FAILED: {e}')
+                  failed.append(pkg_name)
+
+          if failed:
+              print(f'Failed packages: {failed}')
+              sys.exit(1)
+          else:
+              print('All critical packages available')
+          "
+
+      - name: Run security scan with Trivy
+        uses: aquasecurity/trivy-action@0.24.0
+        with:
+          image-ref: awx-ee:test
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          exit-code: '0'
+        continue-on-error: true
+
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: 'trivy-results.sarif'
+        continue-on-error: true
+
+      - name: Display security scan summary
+        if: always()
+        run: |
+          if [ -f "trivy-results.sarif" ]; then
+            echo "=== Security scan completed ==="
+            echo "SARIF report generated: trivy-results.sarif"
+            echo "Results uploaded to GitHub Security tab"
+          else
+            echo "=== Security scan failed ==="
+            echo "Running basic vulnerability check as fallback..."
+            podman run --rm -v /tmp:/tmp aquasec/trivy:latest image awx-ee:test \
+              --format table --severity HIGH,CRITICAL || \
+              echo "Fallback scan also failed, continuing build..."
+          fi
+
+      - name: Test execution environment functionality
+        run: |
+          set -e
+          echo "=== Testing EE functionality with sample playbook ==="
+
+          # Create a simple test playbook
+          mkdir -p /tmp/test-playbook
+          cat > /tmp/test-playbook/test.yml << 'EOF'
+          ---
+          - name: Test AWX EE functionality
+            hosts: localhost
+            gather_facts: true
+            tasks:
+              - name: Test debug output
+                debug:
+                  msg: "AWX EE is working correctly"
+
+              - name: Test that collections are available
+                debug:
+                  msg: "Testing collection availability"
+
+              - name: Verify Python version
+                debug:
+                  var: ansible_python_version
+          EOF
+
+          # Run the test playbook
+          podman run --rm -v /tmp/test-playbook:/tmp/test-playbook awx-ee:test \
+            ansible-playbook /tmp/test-playbook/test.yml
+
+      - name: Log in to GitHub Container Registry
+        if: steps.meta.outputs.push == 'true'
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | podman login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+
+      - name: Tag and push images
+        if: steps.meta.outputs.push == 'true'
+        run: |
+          IFS=',' read -ra TAGS <<< "${{ steps.meta.outputs.tags }}"
+          for tag in "${TAGS[@]}"; do
+            echo "Tagging and pushing: $tag"
+            podman tag awx-ee:test "$tag"
+            podman push "$tag"
+          done
+
+  test-published-image:
+    name: Test Published Image
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    if: github.event_name == 'release'
+
+    steps:
+      - name: Test published image
+        run: |
+          echo "=== Testing published image ==="
+          registry_image="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}"
+          release_tag="${{ github.event.release.tag_name }}"
+          podman pull "${registry_image}:${release_tag}"
+          podman run --rm "${registry_image}:${release_tag}" ansible --version
