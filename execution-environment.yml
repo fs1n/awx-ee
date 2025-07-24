@@ -23,6 +23,7 @@ dependencies:
       - name: google.cloud
       - name: openstack.cloud
       - name: community.vmware
+      - name: community.windows
       - name: vmware.vmware
       - name: vmware.vmware_rest
       - name: ovirt.ovirt
@@ -68,6 +69,7 @@ dependencies:
     receptorctl
     pyvmomi
     vcf-sdk
+    antsibull-changelog
 #    nsx_python_sdk==9.0.0
 #    nsx_policy_python_sdk==9.0.0
 #    nsx_global_policy_python_sdk==9.0.0
