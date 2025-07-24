@@ -131,6 +131,33 @@ EOF
     print_status "All tests passed! ✓"
 }
 
+# Function to run security scan
+run_security_scan() {
+    local image_name="$1"
+    print_status "Starting security scan for image: $image_name"
+    
+    # Check if trivy is available
+    if command -v trivy >/dev/null 2>&1; then
+        print_status "Running Trivy security scan..."
+        if trivy image --severity HIGH,CRITICAL "$image_name"; then
+            print_status "Security scan completed ✓"
+        else
+            print_status "Security scan found issues ⚠️"
+            echo "Note: Security scan found vulnerabilities. Check the output above."
+        fi
+    else
+        print_status "Trivy not found, attempting to use container version..."
+        if $CONTAINER_RUNTIME run --rm -v /tmp:/tmp aquasec/trivy:latest image \
+            --severity HIGH,CRITICAL "$image_name"; then
+            print_status "Security scan completed ✓"
+        else
+            print_status "Security scan unavailable ⚠️"
+            echo "Note: Install 'trivy' for local security scanning."
+            echo "Visit: https://aquasecurity.github.io/trivy/latest/getting-started/installation/"
+        fi
+    fi
+}
+
 # Function to build the image
 build_image() {
     print_status "Building AWX Execution Environment..."
@@ -185,6 +212,7 @@ Commands:
     validate    Validate the execution environment configuration
     build       Build the execution environment image
     test        Run tests on existing image
+    scan        Run security scan on existing image
     all         Run validate, build, and test (default)
 
 Options:
@@ -197,6 +225,7 @@ Examples:
     $0                      # Run all steps (validate, build, test)
     $0 build                # Only build the image
     $0 test                 # Only run tests
+    $0 scan                 # Only run security scan
     $0 -r docker build      # Build using docker instead of podman
     $0 -t my-awx-ee:latest  # Use custom image tag
 
@@ -222,7 +251,7 @@ while [[ $# -gt 0 ]]; do
             show_help
             exit 0
             ;;
-        validate|build|test|all)
+        validate|build|test|scan|all)
             COMMAND="$1"
             shift
             ;;
@@ -256,6 +285,9 @@ case "$COMMAND" in
         ;;
     test)
         run_tests "$IMAGE_NAME"
+        ;;
+    scan)
+        run_security_scan "$IMAGE_NAME"
         ;;
     all)
         validate_config
