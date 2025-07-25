@@ -51,31 +51,7 @@ dependencies:
     gcc-c++ [platform:rpm compile]
     make [platform:rpm compile]
     openssl-devel [platform:rpm compile]
-  python: |
-    setuptools
-    git+https://github.com/ansible/ansible-sign
-    git+https://github.com/vmware/vsphere-automation-sdk-python
-    ncclient
-    paramiko
-    pykerberos
-    pyOpenSSL
-    pypsrp[kerberos,credssp]
-    pywinrm[kerberos,credssp]
-    toml
-    pexpect>=4.5
-    python-daemon
-    pyyaml
-    six
-    receptorctl
-    pyvmomi
-    vcf-sdk
-    antsibull-changelog
-#    nsx_python_sdk==9.0.0
-#    nsx_policy_python_sdk==9.0.0
-#    nsx_global_policy_python_sdk==9.0.0
-#    vmware_vapi_runtime==2.61.2
-#    vapi_common==2.61.2
-#    vmware_vapi_common_client==2.61.2
+  python: requirements.txt
 additional_build_steps:
   append_base:
     - RUN $PYCMD -m pip install -U pip
