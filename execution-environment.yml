@@ -61,3 +61,4 @@ additional_build_steps:
     - RUN git lfs install --system
     # SymLink `python` -> `python3.11`
     - RUN alternatives --install /usr/bin/python python /usr/bin/python3.11 311
+    - LABEL org.opencontainers.image.description="AWX EE enhanced for VMware automation with official SDKs"
