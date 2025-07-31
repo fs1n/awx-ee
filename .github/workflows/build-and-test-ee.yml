@@ -18,12 +18,6 @@ jobs:
     name: Validate Dependencies
     runs-on: ubuntu-latest
     steps:
-      - name: Update PIP
-        run: pip install --upgrade pip
-
-      - name: Install Kerberos development libraries
-        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
-
       - name: Checkout repository
         uses: actions/checkout@v4
 
@@ -31,6 +25,12 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
+
+      - name: Update PIP
+        run: pip install --upgrade pip
+
+      - name: Install Kerberos development libraries
+        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
 
       - name: Install dependencies
         run: |
