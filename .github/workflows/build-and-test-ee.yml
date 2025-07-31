@@ -8,6 +8,7 @@ name: Build and Test AWX Execution Environment
 #    branches: [main]
   release:
     types: [published]
+  workflow_dispatch:  # Allow manual triggering
 
 env:
   REGISTRY: ghcr.io
@@ -28,14 +29,18 @@ jobs:
 
       - name: Update PIP
         run: pip install --upgrade pip
-
-      - name: Install Kerberos development libraries
-        run: sudo apt-get update && sudo apt-get install -y libkrb5-dev
-
-      - name: Install dependencies
+      
+      - name: Install System Dependencies
         run: |
-          pip install -r requirements.txt
-          pip install yamllint
+          sudo apt-get update
+          sudo apt-get install -y libkrb5-dev
+          # Verify Kerberos libraries installation
+          which krb5-config || echo "krb5-config not found!"
+
+      - name: Install Python dependencies
+        run: |
+          # Install only essential dependencies first to avoid failures
+          pip install pyyaml ansible-builder yamllint
 
       - name: Validate execution-environment.yml
         run: |
@@ -83,10 +88,15 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install build dependencies
+      - name: Install system dependencies
         run: |
           sudo apt-get update
-          sudo apt-get install -y podman
+          sudo apt-get install -y podman libkrb5-dev
+          which krb5-config || echo "krb5-config not found!"
+
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip
           pip install -r requirements.txt
 
       - name: Set image tags
@@ -120,6 +130,7 @@ jobs:
           echo "Build completed successfully"
           podman images | grep awx-ee
 
+      # The rest of the workflow remains unchanged
       - name: Test image basic functionality
         run: |
           set -e
