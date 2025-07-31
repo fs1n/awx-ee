@@ -26,6 +26,8 @@ dependencies:
       - name: community.windows
       - name: vmware.vmware
       - name: vmware.vmware_rest
+      - name: paessler.prtg
+        source: git+https://gitlab.com/PRTG/prtg-ansible.git#/ansible_collections/paessler/prtg
       - name: ovirt.ovirt
       - name: kubernetes.core
       - name: ansible.posix
