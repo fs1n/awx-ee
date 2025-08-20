@@ -1,6 +1,7 @@
 setuptools
 git+https://github.com/ansible/ansible-sign
 git+https://github.com/vmware/vsphere-automation-sdk-python
+git+https://github.com/vmware/vcf-sdk-python
 ncclient
 paramiko
 pykerberos
