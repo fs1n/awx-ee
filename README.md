@@ -1,5 +1,7 @@
 # AWX EE – VMware Enhanced Fork
 
+[![DeepWiki Documentation](https://deepwiki.com/badge.svg)](https://deepwiki.com/fs1n/awx-ee)
+
 This repository is a fork of the default [AWX execution environment](https://github.com/ansible/awx-ee), enhanced for VMware automation workflows. It replaces the deprecated `community.vmware` collection and integrates the official VMware SDKs and dependencies.
 
 ## Table of Contents
