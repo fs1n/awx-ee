@@ -2,7 +2,7 @@
 # Test script for AWX Execution Environment
 # This script provides local testing capabilities that mirror the CI/CD pipeline
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
@@ -13,7 +13,6 @@ NC='\033[0m' # No Color
 # Default values
 CONTAINER_RUNTIME="podman"
 IMAGE_NAME="awx-ee:test"
-VERBOSE=false
 
 # Function to print colored output
 print_status() {
@@ -225,7 +224,6 @@ Commands:
 Options:
     -r, --runtime RUNTIME    Container runtime (podman or docker, default: podman)
     -t, --tag TAG           Image tag (default: awx-ee:test)
-    -v, --verbose           Verbose output
     -h, --help              Show this help
 
 Examples:
@@ -249,10 +247,6 @@ while [[ $# -gt 0 ]]; do
         -t|--tag)
             IMAGE_NAME="$2"
             shift 2
-            ;;
-        -v|--verbose)
-            VERBOSE=true
-            shift
             ;;
         -h|--help)
             show_help
